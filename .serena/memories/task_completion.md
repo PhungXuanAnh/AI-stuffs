@@ -15,4 +15,4 @@ node --check auto-click-on-chat/<filename>.js
 ## Key Reminder
 - Scripts in `auto-click-on-chat/` are deployed by patching IDE HTML files at OS install time
 - There is no hot-reload; a re-patch or IDE restart is required to test changes in real IDE
-- The `kiro-debug/` tooling (inject.js, find-run-button.js) can be used to test changes live via CDP without patching
+- The `debug-scripts/` tooling (inject.js, find-run-button.js) can be used to test changes live via CDP without patching

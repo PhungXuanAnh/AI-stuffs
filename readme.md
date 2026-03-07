@@ -12,15 +12,15 @@ auto-click-on-chat/
 ├── auto-kiro-webview.js       # Kiro webview auto-click (Run button)
 ├── auto-antigravity.js        # Antigravity workbench customizations
 ├── auto-windsurf.js           # Windsurf workbench customizations
-├── auto-click-confirm.js      # Generic auto-click confirm script
-└── kiro-debug/                # CDP debugging tools for Kiro
-    ├── inject.js              # General-purpose CDP script injector
-    ├── find-run-button.js     # Search all contexts for Run button
-    ├── find-waiting-buttons.js # Find buttons in "Waiting on your input" container
-    ├── read-console-logs.js   # Stream console output from all CDP targets
-    ├── diagnose-autoclick.js  # Diagnose if auto-click script loaded correctly
-    ├── package.json           # Dependencies (chrome-remote-interface)
-    └── CDP-DEBUGGING-GUIDE.md # Detailed CDP debugging guide
+└── auto-click-confirm.js      # Generic auto-click confirm script
+
+debug-scripts/                     # CDP debugging tools for VS Code-based IDEs
+├── inject.js                      # General-purpose CDP script injector
+├── find-run-button.js             # Search all contexts for Run button
+├── find-waiting-buttons.js        # Find buttons in "Waiting on your input" container
+├── read-console-logs.js           # Stream console output from all CDP targets
+├── diagnose-autoclick.js          # Diagnose if auto-click script loaded correctly
+└── package.json                   # Dependencies (chrome-remote-interface)
 ```
 
 ## How It Works

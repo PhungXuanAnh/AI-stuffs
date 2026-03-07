@@ -1,23 +1,37 @@
-# CDP (Chrome DevTools Protocol) Debugging Guide for Kiro IDE
+---
+applyTo: '**'
+---
 
-Guide for AI agents (Copilot, Cursor, etc.) to debug and inject JavaScript into Kiro IDE using CDP.
+# CDP (Chrome DevTools Protocol) Debugging Guide for VS Code-based IDEs
+
+Guide for AI agents (Copilot, Cursor, etc.) to debug and inject JavaScript into VS Code-based IDEs (VSCode, Kiro, Antigravity, Windsurf) using CDP.
 
 ## Prerequisites
 
-- Kiro IDE installed at `/usr/share/kiro/`
+- A VS Code-based IDE installed (VSCode, Kiro, Antigravity, or Windsurf)
 - Node.js available
-- `chrome-remote-interface` npm package (installed in `kiro-debug/`)
+- `chrome-remote-interface` npm package (installed in `debug-scripts/`)
 
-## 1. Launch Kiro with CDP Enabled
+## 1. Launch an IDE with CDP Enabled
+
+All VS Code-based IDEs support the `--remote-debugging-port` flag:
 
 ```bash
 # Kill existing instances and start with debug port
-pkill -f "kiro" 2>/dev/null
+# Replace <ide-command> with: code, kiro, antigravity, or windsurf
+pkill -f "<ide-command>" 2>/dev/null
 sleep 2
-kiro --remote-debugging-port=9333 &>/dev/null &
+<ide-command> --remote-debugging-port=9333 &>/dev/null &
 ```
 
-Wait ~15 seconds for Kiro to fully load, then verify:
+| IDE          | Command        | Default Install Path          |
+|--------------|----------------|-------------------------------|
+| VSCode       | `code`         | `/usr/share/code/`            |
+| Kiro         | `kiro`         | `/usr/share/kiro/`            |
+| Antigravity  | `antigravity`  | `/usr/share/antigravity/`     |
+| Windsurf     | `windsurf`     | `/usr/share/windsurf/`        |
+
+Wait ~15 seconds for the IDE to fully load, then verify:
 
 ```bash
 curl -s http://localhost:9333/json/version | head -5
@@ -31,22 +45,24 @@ Expected output includes `"Browser": "Chrome/..."` and `"webSocketDebuggerUrl"`.
 curl -s http://localhost:9333/json/list | python3 -m json.tool
 ```
 
-Kiro exposes 3 targets:
+VS Code-based IDEs typically expose multiple targets. Example targets for Kiro:
 
 | Index | Type     | Description                          | URL Prefix             |
 |-------|----------|--------------------------------------|------------------------|
 | 0     | `page`   | Main workbench (top frame)           | `vscode-file://`       |
-| 1     | `iframe` | Kiro Agent webview (has the UI)      | `vscode-webview://`    |
+| 1     | `iframe` | Agent webview (has the UI)           | `vscode-webview://`    |
 | 2     | `worker` | Background worker                    | (empty)                |
 
-The **iframe target** (index 1) with `extensionId=kiro.kiroAgent` in its URL is where the Kiro Chat UI lives.
+For Kiro, the **iframe target** (index 1) with `extensionId=kiro.kiroAgent` in its URL is where the Chat UI lives. Other IDEs may have different iframe targets for their AI agent panels.
 
-## 3. Kiro Iframe Structure (Critical Knowledge)
+## 3. Webview Iframe Structure (Critical Knowledge)
+
+VS Code-based IDEs use nested iframes for webview extensions. Example for Kiro:
 
 ```
 workbench.html (top frame, vscode-file://)
   └── iframe.webview.ready (vscode-webview://)        ← "outer context" (Context 1)
-        └── iframe#active-frame (vscode-webview://)   ← "inner context" (Context 2) — Kiro UI here
+        └── iframe#active-frame (vscode-webview://)   ← "inner context" (Context 2) — UI here
 ```
 
 ### Key Facts
@@ -56,20 +72,20 @@ workbench.html (top frame, vscode-file://)
 - **Top frame has NO Node.js APIs**: `require`, `process`, `module` are all `undefined`. The `require('electron').webFrame` approach does NOT work.
 - When connecting to the iframe CDP target, you get **2 execution contexts**:
   - **Context 1** (outer): The `index.html` host. Has `iframe#active-frame`. Can access inner DOM via `contentDocument`.
-  - **Context 2** (inner): The `active-frame`. Has the actual Kiro UI buttons.
+  - **Context 2** (inner): The `active-frame`. Has the actual UI buttons.
 
 ## 4. Using the Debug Tools
 
 ### `inject.js` — General-purpose script injector
 
 ```bash
-cd kiro-debug/
+cd debug-scripts/
 
 # List all targets
 node inject.js dummy.js
 
 # Inject a script into a specific target (by index)
-node inject.js ../auto-kiro-webview.js 1
+node inject.js ../auto-click-on-chat/auto-kiro-webview.js 1
 ```
 
 ### `read-console-logs.js` — Stream console output from all targets
@@ -113,13 +129,14 @@ Use this when auto-click isn't working to determine if the script loaded at all.
 ```javascript
 const CDP = require('chrome-remote-interface');
 
-async function injectIntoKiroWebview(code) {
+async function injectIntoWebview(code) {
     const targets = await CDP.List({ port: 9333 });
-    const kiroTarget = targets.find(t =>
+    // For Kiro, find the kiroAgent iframe; for other IDEs, adjust the filter
+    const webviewTarget = targets.find(t =>
         t.type === 'iframe' && t.url && t.url.includes('kiroAgent')
     );
     
-    const client = await CDP({ target: kiroTarget.id, port: 9333 });
+    const client = await CDP({ target: webviewTarget.id, port: 9333 });
     const { Runtime } = client;
 
     // IMPORTANT: Register context handler BEFORE Runtime.enable()
@@ -246,7 +263,7 @@ The `<meta http-equiv="Content-Security-Policy">` tag restricts which scripts ca
 
 3. Run `diagnose-autoclick.js` to check if the script executed:
    ```bash
-   cd kiro-debug && node diagnose-autoclick.js
+   cd debug-scripts && node diagnose-autoclick.js
    ```
 
 ### Fix

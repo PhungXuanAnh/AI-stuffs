@@ -1,5 +1,5 @@
 {
-  "name": "kiro-debug",
+  "name": "debug-scripts",
   "version": "1.0.0",
   "main": "diagnostic.js",
   "scripts": {
