@@ -59,23 +59,29 @@ function waitAndAddIcon() {
 var FILE_SERVER_PORT = 3847;
 
 function getWorkspacePath() {
-    // Extract workspace path from SCM data-uri (most reliable)
+    // Primary: VS Code internal configuration (most reliable, always available)
+    try {
+        var config = vscode.context.configuration();
+        if (config && config.workspace && config.workspace.uri) {
+            return config.workspace.uri._fsPath || config.workspace.uri.path || '';
+        }
+    } catch (e) { /* vscode.context not available */ }
+
+    // Fallback 1: SCM data-uri
     var scmEditor = document.querySelector('.monaco-editor[data-uri*="vscode-scm"]');
     if (scmEditor) {
         var uri = scmEditor.getAttribute('data-uri');
         var match = uri.match(/rootUri%3D(.+)/);
         if (match) {
             var decoded = decodeURIComponent(decodeURIComponent(match[1]));
-            // decoded is like file:///home/user/repo/project
             return decoded.replace(/^file:\/\//, '');
         }
     }
-    // Fallback: extract from file editor data-uri
+    // Fallback 2: file editor data-uri
     var fileEditor = document.querySelector('.monaco-editor[data-uri^="file:///"]');
     if (fileEditor) {
         var fileUri = fileEditor.getAttribute('data-uri');
         var filePath = fileUri.replace(/^file:\/\//, '');
-        // Return parent directory
         return filePath.substring(0, filePath.lastIndexOf('/'));
     }
     return '';
