@@ -11,6 +11,8 @@ The server accepts POST requests to write files:
     Body: { "filename": "test.txt", "content": "hello", "workspace_path": "/home/user/project" }
 
 Files are written relative to the workspace_path provided in each request.
+For .txt files, the filename is also appended to .git/info/exclude (if that
+file exists) so the file is not tracked by Git.
 """
 
 import argparse
@@ -46,78 +48,11 @@ class FileServerHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/write-file":
             return self._handle_write_file()
-        elif self.path == "/send-chat":
-            return self._handle_send_chat()
         else:
             self.send_response(404)
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(b'{"error": "Not found"}')
-
-    def _handle_send_chat(self):
-        """Send a message to VS Code Copilot chat via CDP using send-to-chat.js."""
-        content_length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
-        try:
-            body = json.loads(raw)
-        except json.JSONDecodeError:
-            body = {}
-
-        text = body.get("text", "")
-        if not text:
-            self.send_response(400)
-            self._send_cors_headers()
-            self.end_headers()
-            self.wfile.write(b'{"error": "text is required"}')
-            return
-
-        cdp_port = body.get("cdp_port", 9333)
-        new_chat = body.get("new_chat", True)
-
-        import subprocess
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        debug_scripts_dir = os.path.join(os.path.dirname(script_dir), "debug-scripts")
-        send_script = os.path.join(debug_scripts_dir, "send-to-chat.js")
-
-        cmd = ["node", send_script, "--port", str(cdp_port)]
-        if not new_chat:
-            cmd.append("--no-new-chat")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                input=text,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=debug_scripts_dir,
-            )
-            if result.returncode == 0:
-                self.send_response(200)
-                self._send_cors_headers()
-                self.end_headers()
-                # send-to-chat.js outputs JSON on success
-                output = result.stdout.strip()
-                self.wfile.write(output.encode() if output else b'{"ok": true}')
-                logger.info(f"Chat sent via CDP: {text[:80]}")
-            else:
-                self.send_response(500)
-                self._send_cors_headers()
-                self.end_headers()
-                err = result.stderr.strip() or result.stdout.strip()
-                self.wfile.write(json.dumps({"error": err}).encode())
-                logger.error(f"CDP send failed: {err}")
-        except subprocess.TimeoutExpired:
-            self.send_response(500)
-            self._send_cors_headers()
-            self.end_headers()
-            self.wfile.write(b'{"error": "CDP timeout (30s)"}')
-        except FileNotFoundError:
-            self.send_response(500)
-            self._send_cors_headers()
-            self.end_headers()
-            self.wfile.write(b'{"error": "node not found"}')
 
     def _handle_write_file(self):
         content_length = int(self.headers.get("Content-Length", 0))
