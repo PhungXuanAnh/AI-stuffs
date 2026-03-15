@@ -227,10 +227,178 @@ function addCustomPromptButton() {
     return false;
 }
 
+// ============================================================================
+// Inject Message Button — yellow arrow button left of red button
+// ============================================================================
+
+function showInjectMessagePopup() {
+    // Remove existing popup if open
+    var existing = document.getElementById('inject-message-popup');
+    if (existing) { existing.parentNode.removeChild(existing); }
+
+    var dialog = document.createElement('div');
+    dialog.id = 'inject-message-popup';
+    dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e1e;border:1px solid #555;border-radius:8px;padding:0;width:500px;max-width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:99999;display:flex;flex-direction:column;resize:both;overflow:auto;min-width:300px;min-height:200px;';
+
+    // Title bar (draggable)
+    var titleBar = document.createElement('div');
+    titleBar.textContent = 'Inject message';
+    titleBar.style.cssText = 'color:#ccc;font-size:13px;padding:10px 16px;font-family:system-ui,sans-serif;cursor:move;border-bottom:1px solid #444;user-select:none;flex-shrink:0;';
+
+    var isDragging = false, dragX = 0, dragY = 0;
+    titleBar.addEventListener('mousedown', function (e) {
+        isDragging = true;
+        dragX = e.clientX - dialog.offsetLeft;
+        dragY = e.clientY - dialog.offsetTop;
+        dialog.style.transform = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+        if (!isDragging) return;
+        dialog.style.left = (e.clientX - dragX) + 'px';
+        dialog.style.top = (e.clientY - dragY) + 'px';
+    });
+    document.addEventListener('mouseup', function () { isDragging = false; });
+
+    var body = document.createElement('div');
+    body.style.cssText = 'padding:12px 16px;flex:1;display:flex;flex-direction:column;';
+
+    var textarea = document.createElement('textarea');
+    textarea.style.cssText = 'width:100%;height:120px;background:#2d2d2d;color:#eee;border:1px solid #555;border-radius:4px;padding:8px;font-size:13px;font-family:system-ui,sans-serif;resize:none;box-sizing:border-box;flex:1;';
+    textarea.placeholder = 'Type your message to inject...';
+
+    var errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'color:#ff4444;font-size:12px;margin-top:6px;font-family:system-ui,sans-serif;display:none;';
+
+    var btnBar = document.createElement('div');
+    btnBar.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid #444;flex-shrink:0;';
+
+    function makeBtn(label, primary) {
+        var b = document.createElement('button');
+        b.textContent = label;
+        b.style.cssText = 'padding:6px 16px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif;cursor:pointer;border:1px solid ' + (primary ? '#0078d4' : '#555') + ';background:' + (primary ? '#0078d4' : 'transparent') + ';color:' + (primary ? '#fff' : '#ccc') + ';';
+        b.addEventListener('mouseenter', function () { b.style.opacity = '0.85'; });
+        b.addEventListener('mouseleave', function () { b.style.opacity = '1'; });
+        return b;
+    }
+
+    var cancelBtn = makeBtn('Cancel', false);
+    var submitBtn = makeBtn('Submit', true);
+
+    function close() { if (dialog.parentNode) dialog.parentNode.removeChild(dialog); }
+
+    function writePauseFile(value) {
+        return writeFileViaServer('pause.txt', value);
+    }
+
+    function submit() {
+        var text = textarea.value.trim();
+        if (!text) return;
+        errorDiv.style.display = 'none';
+        // Write message to injected_message.txt, then write 0 to pause.txt
+        writeFileViaServer('injected_message.txt', text)
+            .then(function (resp) {
+                if (resp && resp.error) {
+                    errorDiv.textContent = 'Server error: ' + resp.error;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                console.log('Wrote injected_message.txt');
+                return writePauseFile('0');
+            })
+            .then(function (resp) {
+                if (resp && resp.error) {
+                    errorDiv.textContent = 'Server error: ' + resp.error;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                console.log('Wrote pause.txt = 0');
+                close();
+            })
+            .catch(function (err) {
+                errorDiv.textContent = 'Connection error: Could not reach file server at port ' + FILE_SERVER_PORT + '. Is it running?';
+                errorDiv.style.display = 'block';
+                console.error('Inject message failed:', err);
+            });
+    }
+
+    cancelBtn.addEventListener('click', function () {
+        writePauseFile('0')
+            .then(function () { console.log('Wrote pause.txt = 0 (cancel)'); })
+            .catch(function (err) { console.error('Failed to write pause.txt:', err); });
+        close();
+    });
+    submitBtn.addEventListener('click', submit);
+
+    textarea.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
+    });
+
+    body.appendChild(textarea);
+    body.appendChild(errorDiv);
+    btnBar.appendChild(cancelBtn);
+    btnBar.appendChild(submitBtn);
+    dialog.appendChild(titleBar);
+    dialog.appendChild(body);
+    dialog.appendChild(btnBar);
+    document.body.appendChild(dialog);
+
+    setTimeout(function () { textarea.focus(); }, 50);
+}
+
+function addInjectMessageButton() {
+    var toolbar = document.querySelector('.chat-execute-toolbar');
+    if (!toolbar || document.getElementById('inject-message-btn')) return false;
+
+    var li = document.createElement('li');
+    li.className = 'action-item menu-entry';
+    li.setAttribute('role', 'presentation');
+    li.id = 'inject-message-btn';
+
+    var btn = document.createElement('a');
+    btn.className = 'action-label codicon codicon-arrow-up';
+    btn.style.cssText = 'color: #ffcc00 !important; cursor: pointer;';
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('aria-label', 'Inject message');
+    btn.setAttribute('tabindex', '0');
+
+    btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Write 1 to pause.txt, then open popup
+        writeFileViaServer('pause.txt', '1')
+            .then(function () {
+                console.log('Wrote pause.txt = 1');
+                showInjectMessagePopup();
+            })
+            .catch(function (err) {
+                console.error('Failed to write pause.txt:', err);
+                showInjectMessagePopup(); // still open popup even if write fails
+            });
+    });
+
+    li.appendChild(btn);
+
+    // Insert before the red button (which is the first child of ul)
+    var ul = toolbar.querySelector('ul.actions-container');
+    var redBtn = document.getElementById('custom-prompt-btn');
+    if (ul && redBtn) {
+        ul.insertBefore(li, redBtn);
+        console.log('Inject message button (yellow) added successfully');
+        return true;
+    } else if (ul && ul.firstChild) {
+        ul.insertBefore(li, ul.firstChild);
+        console.log('Inject message button (yellow) added successfully (no red button found)');
+        return true;
+    }
+    return false;
+}
+
 function waitAndAddPromptButton() {
     // Keep checking periodically — VS Code may re-render the toolbar and remove our button
     setInterval(function () {
         addCustomPromptButton();
+        addInjectMessageButton();
     }, 2000);
 }
 
