@@ -1,1 +1,5 @@
 **/node_modules/**
+pause.txt
+injected_message.txt
+user_feedback_and_next_task.txt
+temp.sh
