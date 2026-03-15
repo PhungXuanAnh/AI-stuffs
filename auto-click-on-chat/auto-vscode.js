@@ -147,14 +147,14 @@ function showPromptPopup() {
     function makeBtn(label, primary) {
         var b = document.createElement('button');
         b.textContent = label;
-        b.style.cssText = 'padding:6px 16px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif;cursor:pointer;border:1px solid ' + (primary ? '#0078d4' : '#555') + ';background:' + (primary ? '#0078d4' : 'transparent') + ';color:' + (primary ? '#fff' : '#ccc') + ';';
+        b.style.cssText = 'padding:6px 16px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif;cursor:pointer;border:1px solid ' + (primary ? '#cc3333' : '#555') + ';background:' + (primary ? '#cc3333' : 'transparent') + ';color:' + (primary ? '#fff' : '#ccc') + ';';
         b.addEventListener('mouseenter', function () { b.style.opacity = '0.85'; });
         b.addEventListener('mouseleave', function () { b.style.opacity = '1'; });
         return b;
     }
 
     var cancelBtn = makeBtn('Cancel', false);
-    var submitBtn = makeBtn('Submit', true);
+    var submitBtn = makeBtn('Submit Feedback and Next Task', true);
 
     function close() { if (dialog.parentNode) dialog.parentNode.removeChild(dialog); }
 
@@ -282,14 +282,14 @@ function showInjectMessagePopup() {
     function makeBtn(label, primary) {
         var b = document.createElement('button');
         b.textContent = label;
-        b.style.cssText = 'padding:6px 16px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif;cursor:pointer;border:1px solid ' + (primary ? '#0078d4' : '#555') + ';background:' + (primary ? '#0078d4' : 'transparent') + ';color:' + (primary ? '#fff' : '#ccc') + ';';
+        b.style.cssText = 'padding:6px 16px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif;cursor:pointer;border:1px solid ' + (primary ? '#e6cc80' : '#555') + ';background:' + (primary ? '#e6cc80' : 'transparent') + ';color:' + (primary ? '#000000' : '#ccc') + ';';
         b.addEventListener('mouseenter', function () { b.style.opacity = '0.85'; });
         b.addEventListener('mouseleave', function () { b.style.opacity = '1'; });
         return b;
     }
 
     var cancelBtn = makeBtn('Cancel', false);
-    var submitBtn = makeBtn('Submit', true);
+    var submitBtn = makeBtn('Submit Injected Message', true);
 
     function close() { if (dialog.parentNode) dialog.parentNode.removeChild(dialog); }
 
