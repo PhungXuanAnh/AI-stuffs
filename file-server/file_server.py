@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 LOG_FILE = "/tmp/file_server.log"
 logging.basicConfig(
@@ -33,7 +33,6 @@ logger = logging.getLogger("file-server")
 
 
 class FileServerHandler(BaseHTTPRequestHandler):
-
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -76,6 +75,7 @@ class FileServerHandler(BaseHTTPRequestHandler):
         new_chat = body.get("new_chat", True)
 
         import subprocess
+
         script_dir = os.path.dirname(os.path.abspath(__file__))
         debug_scripts_dir = os.path.join(os.path.dirname(script_dir), "debug-scripts")
         send_script = os.path.join(debug_scripts_dir, "send-to-chat.js")
@@ -88,8 +88,10 @@ class FileServerHandler(BaseHTTPRequestHandler):
             result = subprocess.run(
                 cmd,
                 input=text,
-                capture_output=True, text=True, timeout=30,
-                cwd=debug_scripts_dir
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=debug_scripts_dir,
             )
             if result.returncode == 0:
                 self.send_response(200)
@@ -151,7 +153,9 @@ class FileServerHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self._send_cors_headers()
             self.end_headers()
-            self.wfile.write(b'{"error": "workspace_path is required and must be a valid directory"}')
+            self.wfile.write(
+                b'{"error": "workspace_path is required and must be a valid directory"}'
+            )
             return
 
         # Security: prevent path traversal in filename
@@ -168,6 +172,8 @@ class FileServerHandler(BaseHTTPRequestHandler):
         try:
             with open(target, "w", encoding="utf-8") as f:
                 f.write(content)
+            if safe_name.endswith(".txt"):
+                self._add_to_git_exclude(workspace_path, safe_name)
             self.send_response(200)
             self._send_cors_headers()
             self.end_headers()
@@ -181,13 +187,38 @@ class FileServerHandler(BaseHTTPRequestHandler):
             resp = json.dumps({"error": str(e)})
             self.wfile.write(resp.encode())
 
+    def _add_to_git_exclude(self, workspace_path: str, filename: str) -> None:
+        """Append *filename* to .git/info/exclude if the file exists and the
+        entry is not already present.  Does nothing when the exclude file is
+        absent."""
+        exclude_path = os.path.join(workspace_path, ".git", "info", "exclude")
+        if not os.path.isfile(exclude_path):
+            return
+        try:
+            with open(exclude_path, "r", encoding="utf-8") as f:
+                existing_lines = f.read().splitlines()
+            # Check whether any non-comment line already matches the filename.
+            if filename in existing_lines:
+                logger.info(f"'{filename}' is already in {exclude_path}, skipping.")
+                return
+            with open(exclude_path, "a", encoding="utf-8") as f:
+                # Ensure we start on a new line.
+                f.write(f"\n{filename}\n")
+            logger.info(f"Added '{filename}' to {exclude_path}")
+        except OSError as e:
+            logger.warning(f"Could not update {exclude_path}: {e}")
+
     def log_message(self, format, *args):
         logger.info(args[0])
 
 
 def main():
-    parser = argparse.ArgumentParser(description="HTTP file server for VS Code page context")
-    parser.add_argument("--port", type=int, default=3847, help="Port to listen on (default: 3847)")
+    parser = argparse.ArgumentParser(
+        description="HTTP file server for VS Code page context"
+    )
+    parser.add_argument(
+        "--port", type=int, default=3847, help="Port to listen on (default: 3847)"
+    )
     args = parser.parse_args()
 
     server = HTTPServer(("127.0.0.1", args.port), FileServerHandler)
