@@ -3,14 +3,14 @@
 Simple HTTP file server for writing files from VS Code's page context.
 
 Usage:
-    python3 file_server.py /path/to/project [--port 3847]
+    python3 file_server.py [--port 3847]
 
 The server accepts POST requests to write files:
     POST /write-file
     Content-Type: application/json
-    Body: { "filename": "user_feedback_and_next_task.txt", "content": "hello" }
+    Body: { "filename": "test.txt", "content": "hello", "workspace_path": "/home/user/project" }
 
-Files are written relative to the project path provided as a CLI argument.
+Files are written relative to the workspace_path provided in each request.
 """
 
 import argparse
@@ -33,7 +33,6 @@ logger = logging.getLogger("file-server")
 
 
 class FileServerHandler(BaseHTTPRequestHandler):
-    project_path = ""
 
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -148,6 +147,13 @@ class FileServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"error": "filename is required"}')
             return
 
+        if not workspace_path or not os.path.isdir(workspace_path):
+            self.send_response(400)
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(b'{"error": "workspace_path is required and must be a valid directory"}')
+            return
+
         # Security: prevent path traversal in filename
         safe_name = os.path.basename(filename)
         if safe_name != filename:
@@ -157,8 +163,7 @@ class FileServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"error": "Invalid filename (no path traversal)"}')
             return
 
-        # Use workspace_path from client if provided, otherwise fall back to CLI arg
-        base_dir = workspace_path if workspace_path and os.path.isdir(workspace_path) else self.project_path
+        base_dir = workspace_path
         target = os.path.join(base_dir, safe_name)
         try:
             with open(target, "w", encoding="utf-8") as f:
@@ -182,20 +187,11 @@ class FileServerHandler(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description="HTTP file server for VS Code page context")
-    parser.add_argument("project_path", help="Absolute path to the project directory")
     parser.add_argument("--port", type=int, default=3847, help="Port to listen on (default: 3847)")
     args = parser.parse_args()
 
-    project_path = os.path.abspath(args.project_path)
-    if not os.path.isdir(project_path):
-        logger.error(f"{project_path} is not a directory")
-        sys.exit(1)
-
-    FileServerHandler.project_path = project_path
-
     server = HTTPServer(("127.0.0.1", args.port), FileServerHandler)
     logger.info(f"File server listening on http://127.0.0.1:{args.port}")
-    logger.info(f"Project path: {project_path}")
     logger.info(f"Log file: {LOG_FILE}")
     try:
         server.serve_forever()
